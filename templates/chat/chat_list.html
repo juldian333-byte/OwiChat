@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Chats - OWI Chat{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <div class="sidebar-header">
+            <h3>Chats</h3>
+            <div class="sidebar-actions">
+                <a href="{% url 'chat:start_conversation' %}" class="btn btn-sm btn-primary" title="Chat Baru">
+                    <i class="fas fa-plus"></i>
+                </a>
+                <a href="{% url 'chat:create_group' %}" class="btn btn-sm btn-secondary" title="Buat Grup">
+                    <i class="fas fa-users"></i>
+                </a>
+            </div>
+        </div>
+        
+        <div class="chat-list">
+            {% if conversations %}
+                {% for conversation in conversations %}
+                    <a href="{% url 'chat:conversation_detail' conversation.id %}" class="chat-item">
+                        <div class="chat-avatar">
+                            {% if conversation.conversation_type == 'group' %}
+                                {% if conversation.group_avatar %}
+                                    <img src="{{ conversation.group_avatar.url }}" alt="{{ conversation.name }}">
+                                {% else %}
+                                    <img src="https://ui-avatars.com/api/?name={{ conversation.name }}&background=667eea&color=fff" alt="{{ conversation.name }}">
+                                {% endif %}
+                            {% else %}
+                                {% for participant in conversation.participants.all %}
+                                    {% if participant != request.user %}
+                                        <img src="{{ participant.profile.get_avatar_url }}" alt="{{ participant.username }}">
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="chat-info">
+                            <h4 class="chat-name">
+                                {% if conversation.conversation_type == 'group' %}
+                                    {{ conversation.name }}
+                                {% else %}
+                                    {% for participant in conversation.participants.all %}
+                                        {% if participant != request.user %}
+                                            {{ participant.get_full_name|default:participant.username }}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            </h4>
+                            <p class="chat-preview">
+                                {% if conversation.last_message %}
+                                    {% if conversation.last_message.sender == request.user %}
+                                        You:
+                                    {% else %}
+                                        {{ conversation.last_message.sender.username }}:
+                                    {% endif %}
+                                    {{ conversation.last_message.text|truncatewords:10 }}
+                                {% else %}
+                                    Tidak ada pesan
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="chat-time">
+                            {% if conversation.last_message %}
+                                {{ conversation.last_message.created_at|date:"H:i" }}
+                            {% endif %}
+                        </div>
+                    </a>
+                {% endfor %}
+            {% else %}
+                <p class="no-chats">Tidak ada chat. Mulai percakapan baru!</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="chat-main">
+        <div class="empty-state">
+            <i class="fas fa-comments"></i>
+            <h3>Pilih chat untuk memulai</h3>
+        </div>
+    </div>
+</div>
+
+<style>
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #999;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}

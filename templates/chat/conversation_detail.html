@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if conversation.conversation_type == 'group' %}
+        {{ conversation.name }}
+    {% else %}
+        {% for participant in conversation.participants.all %}
+            {% if participant != request.user %}
+                {{ participant.get_full_name|default:participant.username }}
+            {% endif %}
+        {% endfor %}
+    {% endif %} - OWI Chat
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <div class="sidebar-header">
+            <h3>Chats</h3>
+            <div class="sidebar-actions">
+                <a href="{% url 'chat:start_conversation' %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i>
+                </a>
+                <a href="{% url 'chat:create_group' %}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-users"></i>
+                </a>
+            </div>
+        </div>
+        <div class="chat-list">
+            <!-- Chat list will be populated here -->
+        </div>
+    </div>
+    
+    <div class="chat-main">
+        <div class="chat-header">
+            <div class="header-info">
+                <h2>
+                    {% if conversation.conversation_type == 'group' %}
+                        {{ conversation.name }}
+                    {% else %}
+                        {% for participant in conversation.participants.all %}
+                            {% if participant != request.user %}
+                                {{ participant.get_full_name|default:participant.username }}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </h2>
+                <p>
+                    {% if conversation.conversation_type == 'group' %}
+                        {{ conversation.participants.count }} participants
+                    {% else %}
+                        {% for participant in conversation.participants.all %}
+                            {% if participant != request.user %}
+                                <span class="status {% if participant.profile.is_online %}online{% else %}offline{% endif %}">
+                                    {% if participant.profile.is_online %}Online{% else %}Offline{% endif %}
+                                </span>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="messages-container" id="messagesContainer">
+            {% for message in messages %}
+                <div class="message {% if message.sender == request.user %}sent{% else %}received{% endif %}" data-message-id="{{ message.id }}">
+                    {% if message.sender != request.user %}
+                        <img src="{{ message.sender.profile.get_avatar_url }}" class="message-avatar" alt="{{ message.sender.username }}">
+                    {% endif %}
+                    
+                    <div class="message-content">
+                        {% if message.sender != request.user %}
+                            <p class="message-sender">{{ message.sender.username }}</p>
+                        {% endif %}
+                        
+                        {% if message.image %}
+                            <img src="{{ message.image.url }}" class="message-image">
+                        {% endif %}
+                        
+                        <p class="message-text">{{ message.text }}</p>
+                        
+                        {% if message.file %}
+                            <a href="{{ message.file.url }}" class="message-file" target="_blank">
+                                <i class="fas fa-file"></i> Download
+                            </a>
+                        {% endif %}
+                        
+                        <p class="message-time">{{ message.created_at|date:"H:i" }}</p>
+                        
+                        {% if message.reactions.all %}
+                            <div class="message-reactions">
+                                {% for emoji, users in message.reactions.items %}
+                                    <div class="reaction" title="{{ users|join:', ' }}">
+                                        {{ emoji }} {{ users|length }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if message.sender == request.user %}
+                        <div class="message-actions">
+                            <button class="btn-delete-message" data-message-id="{{ message.id }}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <p class="no-messages">Belum ada pesan. Mulai percakapan!</p>
+            {% endfor %}
+        </div>
+        
+        <div class="chat-input-area">
+            <form id="messageForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="conversation_id" value="{{ conversation.id }}">
+                
+                <div class="input-wrapper">
+                    <input type="file" id="imageInput" class="hidden-input" accept="image/*">
+                    <input type="file" id="fileInput" class="hidden-input">
+                    
+                    <button type="button" class="btn-attach" id="attachImage">
+                        <i class="fas fa-image"></i>
+                    </button>
+                    <button type="button" class="btn-attach" id="attachFile">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    
+                    <textarea id="messageText" name="text" class="message-input" placeholder="Ketik pesan..."></textarea>
+                    
+                    <button type="submit" class="btn-send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hidden-input {
+        display: none;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const conversationId = {{ conversation.id }};
+    const userId = {{ request.user.id }};
+    
+    $(document).ready(function() {
+        // Attach image
+        $('#attachImage').click(function() {
+            $('#imageInput').click();
+        });
+        
+        $('#imageInput').change(function() {
+            if (this.files[0]) {
+                const formData = new FormData($('#messageForm')[0]);
+                formData.append('image', this.files[0]);
+                sendMessage(formData);
+            }
+        });
+        
+        // Attach file
+        $('#attachFile').click(function() {
+            $('#fileInput').click();
+        });
+        
+        $('#fileInput').change(function() {
+            if (this.files[0]) {
+                const formData = new FormData($('#messageForm')[0]);
+                formData.append('file', this.files[0]);
+                sendMessage(formData);
+            }
+        });
+        
+        // Send message
+        $('#messageForm').submit(function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            sendMessage(formData);
+        });
+        
+        // Delete message
+        $('.btn-delete-message').click(function() {
+            const messageId = $(this).data('message-id');
+            if (confirm('Hapus pesan ini?')) {
+                $.post('{% url "chat:delete_message" 0 %}'.replace('0', messageId), {}, function() {
+                    $('[data-message-id="' + messageId + '"]').fadeOut(function() { $(this).remove(); });
+                });
+            }
+        });
+        
+        // Scroll to bottom
+        function scrollToBottom() {
+            const container = $('#messagesContainer');
+            container.scrollTop(container[0].scrollHeight);
+        }
+        
+        scrollToBottom();
+    });
+    
+    function sendMessage(formData) {
+        $.ajax({
+            url: '{% url "chat:send_message" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $('#messageText').val('');
+                addMessageToChat(response);
+            },
+            error: function() {
+                alert('Error sending message');
+            }
+        });
+    }
+    
+    function addMessageToChat(message) {
+        const html = `
+            <div class="message sent" data-message-id="${message.id}">
+                <div class="message-content">
+                    ${message.image ? '<img src="' + message.image + '" class="message-image">' : ''}
+                    <p class="message-text">${message.text}</p>
+                    ${message.file ? '<a href="' + message.file + '" class="message-file" target="_blank"><i class="fas fa-file"></i> Download</a>' : ''}
+                    <p class="message-time">${new Date(message.created_at).toLocaleTimeString()}</p>
+                </div>
+                <div class="message-actions">
+                    <button class="btn-delete-message" data-message-id="${message.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        $('#messagesContainer').append(html);
+        
+        // Attach delete event to new message
+        $(`[data-message-id="${message.id}"] .btn-delete-message`).click(function() {
+            const msgId = $(this).data('message-id');
+            if (confirm('Hapus pesan ini?')) {
+                $.post('{% url "chat:delete_message" 0 %}'.replace('0', msgId), {}, function() {
+                    $('[data-message-id="' + msgId + '"]').fadeOut(function() { $(this).remove(); });
+                });
+            }
+        });
+        
+        // Scroll to bottom
+        const container = $('#messagesContainer');
+        container.scrollTop(container[0].scrollHeight);
+    }
+</script>
+{% endblock %}

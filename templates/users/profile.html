@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ profile_user.username }} - OWI Chat{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="profile-header">
+            <img src="{{ profile.get_avatar_url }}" alt="{{ profile_user.username }}" class="profile-avatar">
+            <div class="profile-info">
+                <h2>{{ profile_user.get_full_name|default:profile_user.username }}</h2>
+                <p class="username">@{{ profile_user.username }}</p>
+                {% if profile.bio %}
+                    <p class="bio">{{ profile.bio }}</p>
+                {% endif %}
+                {% if profile.phone %}
+                    <p class="phone"><i class="fas fa-phone"></i> {{ profile.phone }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if request.user == profile_user %}
+            <div class="profile-actions">
+                <a href="{% url 'users:edit_profile' %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Edit Profile
+                </a>
+            </div>
+        {% elif is_friend %}
+            <div class="profile-actions">
+                <a href="{% url 'chat:conversation_detail' 1 %}" class="btn btn-primary">
+                    <i class="fas fa-comments"></i> Chat
+                </a>
+            </div>
+        {% else %}
+            <div class="profile-actions">
+                <form method="POST" action="{% url 'chat:start_conversation' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="recipient_id" value="{{ profile_user.id }}">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Mulai Chat
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

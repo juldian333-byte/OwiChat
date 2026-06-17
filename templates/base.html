@@ -1,0 +1,50 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OWI Chat{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        {% if user.is_authenticated %}
+            <header class="navbar">
+                <div class="navbar-brand">
+                    <h1>OWI Chat</h1>
+                </div>
+                <nav class="navbar-menu">
+                    <a href="{% url 'chat:chat_list' %}" class="nav-link">
+                        <i class="fas fa-comments"></i> Chats
+                    </a>
+                    <a href="{% url 'users:user_profile' user.username %}" class="nav-link">
+                        <i class="fas fa-user"></i> {{ user.username }}
+                    </a>
+                    <a href="{% url 'users:logout' %}" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </nav>
+            </header>
+        {% endif %}
+
+        <main>
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
